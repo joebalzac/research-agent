@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Research Agent</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main>
+    <h1>Research Agent</h1>
+    <form id="research-form">
+      <label for="question">Research question</label>
+      <textarea id="question" placeholder="What do you want to research?" required></textarea>
+
+      <label for="dir">Local documents folder (optional)</label>
+      <input id="dir" type="text" placeholder="/path/to/local/docs" />
+
+      <button id="submit" type="submit">Research</button>
+    </form>
+
+    <section id="status" class="status"></section>
+    <section id="report" class="report"></section>
+    <section id="sources" class="sources"></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
