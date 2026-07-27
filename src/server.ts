@@ -11,7 +11,7 @@ const PORT = Number(process.env.PORT) || 3001;
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(resolve(__dirname, "../public")));
+app.use(express.static(resolve(__dirname, "../client/dist")));
 
 app.post("/api/research", async (req, res) => {
   const { question, dir } = req.body ?? {};
@@ -26,7 +26,16 @@ app.post("/api/research", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
+  const controller = new AbortController();
+  let closed = false;
+  res.on("close", () => {
+    if (res.writableEnded) return;
+    closed = true;
+    controller.abort();
+  });
+
   const send = (event: string, data: unknown) => {
+    if (closed) return;
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
@@ -35,11 +44,12 @@ app.post("/api/research", async (req, res) => {
       question,
       rootDir: typeof dir === "string" && dir.trim() ? resolve(dir.trim()) : undefined,
       onEvent: (event) => send(event.type, event),
+      signal: controller.signal,
     });
   } catch {
     // Already reported via the onEvent "error" handler above.
   } finally {
-    res.end();
+    if (!closed) res.end();
   }
 });
 

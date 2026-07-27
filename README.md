@@ -14,19 +14,23 @@ The agent also scales its answer to the question: a simple factual question gets
 
 ```
 src/
-  agent.ts          core tool-use loop (Anthropic Messages API, streaming)
+  agent.ts             core tool-use loop (Anthropic Messages API, streaming)
   tools/localFiles.ts  list_directory / read_file / search_local_files, path-traversal safe
-  cli.ts            terminal entry point
-  server.ts         Express server, SSE streaming endpoint
-public/             plain HTML/CSS/JS web UI served by the same Express server
+  cli.ts               terminal entry point
+  server.ts            Express server, SSE streaming endpoint, aborts the agent on client disconnect
+client/                React + TypeScript UI (Vite), served by the same Express server in production
+  src/
+    lib/useResearchStream.ts   fetch + SSE parsing hook, typed against the AgentEvent stream
+    components/                AgentTimeline, ToolCallCard, SourcesList, ReportView, etc.
 ```
 
-No separate frontend build — the web UI is static files served directly by Express, kept deliberately simple rather than scaffolding a full client app.
+The web UI's job is to make the agent's intermediate steps — which tool it's calling, what it searched for, which sources it found — legible in real time, rather than hiding them behind a spinner until a final answer appears.
 
 ## Setup
 
 ```bash
 npm install
+npm install --prefix client
 cp .env.example .env   # add your ANTHROPIC_API_KEY
 ```
 
@@ -39,21 +43,31 @@ npm run cli -- "What are the latest developments in solid-state batteries?"
 npm run cli -- "Summarize the meeting notes" --dir ./my-notes --out report.md
 ```
 
-**Web UI:**
+**Web UI (development):**
 
 ```bash
+npm run dev
+# open http://localhost:5173 (Vite dev server, proxies /api to Express on :3001)
+```
+
+**Web UI (production):**
+
+```bash
+npm run build          # builds client/dist
 npm run server
 # open http://localhost:3001
 ```
 
-Enter a question, optionally point it at a local folder to search, and watch it stream status updates, the answer, and sources live.
+Enter a question, optionally expand "Local folder" to point it at a directory to search, and watch it stream status updates, tool calls, sources, and the answer live. The Stop button aborts the fetch on the client and the in-flight Anthropic request on the server, so cancelling doesn't keep burning API calls in the background.
 
 ## Design notes
 
 - **Path-traversal safety**: local file tools resolve every path against the given root directory and reject anything that escapes it.
 - **Text-file allowlist**: local file reading is limited to plain-text-like extensions (`.md`, `.txt`, `.json`, code files, etc.) — no binary or PDF parsing.
 - **Source tracking**: web search results and local files actually read are deduplicated and surfaced as a `sources` list alongside the report.
+- **Cancellation**: `server.ts` listens for the request's `close` event, aborts an `AbortSignal` threaded through to `client.messages.stream()`, and stops writing to the response once the client has disconnected.
 
 ## Stack
 
-TypeScript, Express, the Anthropic SDK (`@anthropic-ai/sdk`), no frontend framework.
+Backend: TypeScript, Express, the Anthropic SDK (`@anthropic-ai/sdk`).
+Frontend (`client/`): React, TypeScript, Vite, Tailwind CSS v4, Motion (animation), react-markdown.

@@ -24,6 +24,7 @@ export interface RunResearchOptions {
   question: string;
   rootDir?: string;
   onEvent?: (event: AgentEvent) => void;
+  signal?: AbortSignal;
 }
 
 const SYSTEM_PROMPT = `You are a research assistant. Given a question, investigate it using the tools available to you:
@@ -44,7 +45,7 @@ function buildWebSearchTool(): Tool {
   } as unknown as Tool;
 }
 
-export async function runResearch({ question, rootDir, onEvent }: RunResearchOptions): Promise<{
+export async function runResearch({ question, rootDir, onEvent, signal }: RunResearchOptions): Promise<{
   report: string;
   sources: Source[];
 }> {
@@ -77,13 +78,18 @@ export async function runResearch({ question, rootDir, onEvent }: RunResearchOpt
   let finalText = "";
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const stream = client.messages.stream({
-      model,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages,
-      tools,
-    });
+    if (signal?.aborted) break;
+
+    const stream = client.messages.stream(
+      {
+        model,
+        max_tokens: MAX_TOKENS,
+        system: SYSTEM_PROMPT,
+        messages,
+        tools,
+      },
+      { signal }
+    );
 
     stream.on("text", (delta) => emit({ type: "text", delta }));
 
