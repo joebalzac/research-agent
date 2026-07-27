@@ -17,12 +17,15 @@ src/
   agent.ts             core tool-use loop (Anthropic Messages API, streaming)
   tools/localFiles.ts  list_directory / read_file / search_local_files, path-traversal safe
   cli.ts               terminal entry point
-  server.ts            Express server, SSE streaming endpoint, aborts the agent on client disconnect
-client/                React + TypeScript UI (Vite), served by the same Express server in production
+  server.ts            Express server, SSE streaming endpoint (local dev / self-hosting)
+api/research.ts        Vercel serverless function wrapping the same agent core, for hosted deploys
+client/                React + TypeScript UI (Vite)
   src/
     lib/useResearchStream.ts   fetch + SSE parsing hook, typed against the AgentEvent stream
     components/                AgentTimeline, ToolCallCard, SourcesList, ReportView, etc.
 ```
+
+There are two ways this app runs: `src/server.ts` (Express) for local development and self-hosting, and `api/research.ts` (a Vercel Function) for the hosted deploy — both call the exact same `runResearch` core in `src/agent.ts`, just wired to different hosts.
 
 The web UI's job is to make the agent's intermediate steps — which tool it's calling, what it searched for, which sources it found — legible in real time, rather than hiding them behind a spinner until a final answer appears.
 
@@ -59,6 +62,16 @@ npm run server
 ```
 
 Enter a question, optionally expand "Local folder" to point it at a directory to search, and watch it stream status updates, tool calls, sources, and the answer live. The Stop button aborts the fetch on the client and the in-flight Anthropic request on the server, so cancelling doesn't keep burning API calls in the background.
+
+## Deploying to Vercel
+
+1. Import this GitHub repo at [vercel.com/new](https://vercel.com/new). `vercel.json` already tells Vercel how to build it (client build + the `api/research.ts` function) — no manual config needed.
+2. Add an environment variable: `ANTHROPIC_API_KEY` (and optionally `MODEL`, same as `.env`).
+3. Deploy.
+
+Note: the "Local folder" field only works when this app is run locally against your own filesystem — Vercel Functions don't have access to your machine, so it degrades to "Path not found" on the hosted demo, which is expected.
+
+`api/research.ts` sets `maxDuration: 60` (the Hobby-plan ceiling). Most questions finish well under that, but a very deep multi-search query occasionally might not — if that becomes a problem, Vercel Pro allows up to 300s.
 
 ## Design notes
 

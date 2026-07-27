@@ -1,0 +1,10 @@
+{
+  "framework": null,
+  "buildCommand": "npm install --prefix client && npm run client:build",
+  "outputDirectory": "client/dist",
+  "functions": {
+    "api/research.ts": {
+      "maxDuration": 60
+    }
+  }
+}
